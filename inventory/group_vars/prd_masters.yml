@@ -1,0 +1,6 @@
+hosts_group: "prd"
+hosts_master_group: "prd_masters"
+global_ip: "192.168.0.11/24"
+default_nic: "eth0"
+global_nic: "eth0"
+traefik_admin_password: "reallysecretproductionpassword"

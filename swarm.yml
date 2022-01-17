@@ -1,0 +1,7 @@
+---
+- hosts: masters
+  collections:
+    - community.general
+  roles:
+    - docker_swarm
+    - traefik

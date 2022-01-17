@@ -1,0 +1,17 @@
+---
+# handlers file for docker
+- name: restart docker
+  service:
+    name: docker
+    state: restarted
+
+- name: save iptables
+  iptables_state:
+    state: saved
+    path: /etc/sysconfig/iptables
+
+- name: save ip6tables
+  iptables_state:
+    state: saved
+    ip_version: ipv6
+    path: /etc/sysconfig/ip6tables

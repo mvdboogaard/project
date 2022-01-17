@@ -1,0 +1,103 @@
+---
+# tasks file for docker_swarm
+- name: Install python packages
+  yum:
+    name: 
+      - python-pip
+    state: present
+
+- name: Install docker from pip
+  pip:
+    name:
+      - docker-compose==1.10.1
+      - docker==2.0.0
+
+- name: Configure second network card
+  template:
+    src: etc/sysconfig/network-scripts/ifcfg-eth1.j2
+    dest: /etc/sysconfig/network-scripts/ifcfg-eth1
+    owner: root
+    group: root
+    mode: '0644'
+  when: ansible_eth1 is defined
+  register: eth1_configured
+
+- name: Restart network if network config is changed
+  service:
+    name: network
+    state: restarted
+  when: eth1_configured.changed
+  register: network_restarted
+
+- name: Gather facts as we need the eth1 facts
+  setup:
+  when: network_restarted.changed
+
+- name: Open Docker swarm manager TCP ports
+  iptables:
+    action: insert
+    chain: INPUT
+    in_interface: eth1
+    protocol: tcp
+    ctstate: NEW
+    syn: match
+    destination_port: "{{ item }}"
+    jump: ACCEPT
+  with_items:
+    - 2377
+    - 7946
+  notify:
+    - save iptables
+
+- name: Open Docker swarm manager UDP ports
+  iptables:
+    action: insert
+    chain: INPUT
+    in_interface: eth1
+    protocol: udp
+    ctstate: NEW
+    destination_port: "{{ item }}"
+    jump: ACCEPT
+  with_items:
+    - 7946
+    - 4789
+  notify:
+    - save iptables
+
+- name: Init swarm on the first node
+  community.general.docker_swarm:
+    state: present
+    listen_addr: 'eth1'
+    advertise_addr: 'eth1'
+  register: result
+  when: inventory_hostname == groups[hosts_master_group][0]
+
+- name: Get join-token for manager nodes
+  set_fact:
+    join_token_manager: "{{ hostvars[groups[hosts_master_group][0]].result.swarm_facts.JoinTokens.Manager }}"
+
+- name: Get join-token for worker nodes
+  set_fact:
+    join_token_worker: "{{ hostvars[groups[hosts_master_group][0]].result.swarm_facts.JoinTokens.Worker }}"
+
+- name: Join other managers
+  community.general.docker_swarm:
+    state: join
+    join_token: "{{ join_token_manager }}"
+    listen_addr: 'eth1'
+    advertise_addr: 'eth1'
+    remote_addrs: "{{ hostvars[groups[hosts_master_group][0]].ansible_eth1.ipv4.address }}"
+  when:
+    - inventory_hostname in groups[hosts_master_group]
+    - inventory_hostname != groups[hosts_master_group][0]
+
+- name: Join workers
+  community.general.docker_swarm:
+    state: join
+    join_token: "{{ join_token_worker }}"
+    advertise_addr: 'eth1'
+    listen_addr: 'eth1'
+    remote_addrs: "{{ hostvars[groups['swarm_managers'][0]].ansible_eth1.ipv4.address }}"
+  when:
+    - inventory_hostname not in groups[hosts_master_group]
+    - inventory_hostname in groups[hosts_group]

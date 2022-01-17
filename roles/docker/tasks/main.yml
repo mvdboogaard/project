@@ -1,0 +1,73 @@
+---
+# tasks file for docker
+- name: Add docker repo
+  yum_repository:
+    name: docker-ce-stable
+    description: Docker CE Stable - $basearch
+    baseurl: https://download.docker.com/linux/centos/$releasever/$basearch/stable
+    enabled: yes
+    gpgcheck: yes
+    gpgkey: https://download.docker.com/linux/centos/gpg
+
+- name: Set IP-forwarding and bridge-nf-call-(6)iptables
+  sysctl:
+    name: "{{ item }}"
+    value: '1'
+    sysctl_set: yes
+    state: present
+    reload: yes
+  with_items:
+    - net.ipv4.ip_forward
+
+- name: Install docker
+  yum:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+    state: present
+
+- name: Start and enable docker service
+  service:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: Create daemon.json file
+  template:
+    src: etc/docker/daemon.json.j2
+    dest: /etc/docker/daemon.json
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - restart docker
+
+- name: Open FW port 9323 for Prometheus
+  iptables:
+    action: insert
+    chain: INPUT
+    in_interface: eth0
+    protocol: tcp
+    ctstate: NEW
+    syn: match
+    destination_port: 9323
+    jump: ACCEPT
+    source: "192.168.0.100"
+  notify:
+    - save iptables
+
+- name: Get users from admins group
+  getent:
+    database: group
+    split: ':'
+    key: admins
+
+- name: Add users to local docker group
+  lineinfile:
+    dest: /etc/group
+    regexp: '^(docker:x:.*:)(.*)'
+    line: '\1{{ getent_group["admins"][2] }}'
+    state: present
+    backrefs: yes
+

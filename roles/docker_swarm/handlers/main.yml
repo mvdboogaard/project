@@ -1,0 +1,12 @@
+---
+# handlers file for docker_swarm
+- name: save iptables
+  community.general.iptables_state:
+    state: saved
+    path: /etc/sysconfig/iptables
+
+- name: save ip6tables
+  community.general.iptables_state:
+    state: saved
+    ip_version: ipv6
+    path: /etc/sysconfig/ip6tables

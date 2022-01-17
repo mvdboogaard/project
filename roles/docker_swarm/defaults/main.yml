@@ -1,0 +1,3 @@
+---
+# defaults file for docker_swarm
+eth1_address: '127.0.0.2'

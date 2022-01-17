@@ -65,7 +65,7 @@
     - save iptables
 
 - name: Init swarm on the first node
-  community.general.docker_swarm:
+  community.docker.docker_swarm:
     state: present
     listen_addr: 'eth1'
     advertise_addr: 'eth1'
@@ -81,7 +81,7 @@
     join_token_worker: "{{ hostvars[groups[hosts_master_group][0]].result.swarm_facts.JoinTokens.Worker }}"
 
 - name: Join other managers
-  community.general.docker_swarm:
+  community.docker.docker_swarm:
     state: join
     join_token: "{{ join_token_manager }}"
     listen_addr: 'eth1'
@@ -92,7 +92,7 @@
     - inventory_hostname != groups[hosts_master_group][0]
 
 - name: Join workers
-  community.general.docker_swarm:
+  community.docker.docker_swarm:
     state: join
     join_token: "{{ join_token_worker }}"
     advertise_addr: 'eth1'
